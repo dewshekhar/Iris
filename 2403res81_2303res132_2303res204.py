@@ -8,7 +8,7 @@ url = "https://raw.githubusercontent.com/dewshekhar/ML-C/main/Iris.csv"
 df = pd.read_csv(url)
 
 # Select the features for clustering
-selected_features = ['SepalLengthCm', 'PetalLengthCm']
+selected_features = ['SepalLengthCm', 'SepalWidthCm', 'PetalLengthCm', 'PetalWidthCm']
 
 # Extract selected features
 X = df[selected_features]
@@ -64,7 +64,7 @@ for iteration in range(max_iterations):
     new_medoids = update_medoids(clusters)
 
     # Calculate the change in medoid positions
-    medoid_distance = sum(manhattan_distance(new, old) for new, old in zip(new_medoids, medoids))
+    medoid_distance = sum(sum(manhattan_distance(new, old) for old in cluster) for new, cluster in zip(new_medoids, clusters.values()))
 
     if medoid_distance < tolerance:
         break
@@ -78,8 +78,15 @@ for cluster_label, points in enumerate(clusters.values()):
         df.loc[(X_std[selected_features[0]] == point[0]) & 
                (X_std[selected_features[1]] == point[1]), 'cluster_kmedoids'] = cluster_label
 
-# Count the number of data points in each K-Medoids cluster
-cluster_counts_kmedoids = df['cluster_kmedoids'].value_counts()
+# Count data points in each cluster for K-Medoids
+count_kmedoids = df['cluster_kmedoids'].value_counts().sort_index()
+
+# Calculate the Sum of Squared Errors (SSE) for K-Medoids
+sse_kmedoids = 0
+for cluster_label, medoid in enumerate(medoids):
+    cluster_points = clusters[cluster_label]
+    for point in cluster_points:
+        sse_kmedoids += np.sum((point - medoid) ** 2)
 
 # Initialize cluster centroids randomly for K-Means
 def initialize_centroids(X, k):
@@ -134,46 +141,78 @@ for cluster_label, points in enumerate(clusters.values()):
         df.loc[(X_std[selected_features[0]] == point[0]) & 
                (X_std[selected_features[1]] == point[1]), 'cluster_kmeans'] = cluster_label
 
+# Count data points in each cluster for K-Means
+count_kmeans = df['cluster_kmeans'].value_counts().sort_index()
+
 # Calculate the Sum of Squared Errors (SSE) for K-Means
 sse_kmeans = 0
 for cluster_label, centroid in enumerate(centroids):
     cluster_data = clusters[cluster_label]
     for point in cluster_data:
-        sse_kmeans += euclidean_distance(point, centroid) ** 2
+        sse_kmeans += np.sum((point - centroid) ** 2)
 
-# Count the number of data points in each K-Means cluster
-cluster_counts_kmeans = df['cluster_kmeans'].value_counts()
+# Plot K-Medoids clusters for different feature combinations
+plt.figure(figsize=(18, 5))
 
-# Plot K-Medoids clusters
-plt.figure(figsize=(10, 6))
+plt.subplot(1, 3, 1)
 for cluster_label, color in zip(range(num_clusters), ['b', 'g', 'r']):
     cluster_data = df[df['cluster_kmedoids'] == cluster_label]
-    plt.scatter(cluster_data[selected_features[0]], cluster_data[selected_features[1]], c=color, label=f'Cluster {cluster_label} (K-Medoids)')
-
-    # Add a box with cluster counts slightly above the bottom-right corner
-    box_text = f'Cluster {cluster_label} (K-Medoids):\n{cluster_counts_kmedoids[cluster_label]}'
-    plt.text(8, 0.5 + cluster_label * 0.5, box_text, fontsize=10, color=color, bbox=dict(facecolor='white', edgecolor='black', boxstyle='round'))
-
-plt.xlabel(f'{selected_features[0]} (Standardized)')
-plt.ylabel(f'{selected_features[1]} (Standardized)')
-plt.title(f'K-Medoids Clustering (k={num_clusters})')
+    plt.scatter(cluster_data['SepalLengthCm'], cluster_data['SepalWidthCm'], c=color, label=f'Cluster {cluster_label} (K-Medoids)')
+plt.xlabel('SepalLengthCm')
+plt.ylabel('SepalWidthCm')
+plt.title(f'K-Medoids Clustering (k={num_clusters}) - SSE: {sse_kmedoids:.2f}, Counts: {count_kmedoids.values}')
 plt.legend()
+
+plt.subplot(1, 3, 2)
+for cluster_label, color in zip(range(num_clusters), ['b', 'g', 'r']):
+    cluster_data = df[df['cluster_kmedoids'] == cluster_label]
+    plt.scatter(cluster_data['SepalLengthCm'], cluster_data['PetalLengthCm'], c=color, label=f'Cluster {cluster_label} (K-Medoids)')
+plt.xlabel('SepalLengthCm')
+plt.ylabel('PetalLengthCm')
+plt.title(f'K-Medoids Clustering (k={num_clusters}) - SSE: {sse_kmedoids:.2f}, Counts: {count_kmedoids.values}')
+plt.legend()
+
+plt.subplot(1, 3, 3)
+for cluster_label, color in zip(range(num_clusters), ['b', 'g', 'r']):
+    cluster_data = df[df['cluster_kmedoids'] == cluster_label]
+    plt.scatter(cluster_data['SepalLengthCm'], cluster_data['PetalWidthCm'], c=color, label=f'Cluster {cluster_label} (K-Medoids)')
+plt.xlabel('SepalLengthCm')
+plt.ylabel('PetalWidthCm')
+plt.title(f'K-Medoids Clustering (k={num_clusters}) - SSE: {sse_kmedoids:.2f}, Counts: {count_kmedoids.values}')
+plt.legend()
+
+plt.tight_layout()
 plt.show()
 
-# Plot K-Means clusters
-plt.figure(figsize=(10, 6))
+# Plot K-Means clusters for different feature combinations
+plt.figure(figsize=(18, 5))
+
+plt.subplot(1, 3, 1)
 for cluster_label, color in zip(range(num_clusters), ['b', 'g', 'r']):
     cluster_data = df[df['cluster_kmeans'] == cluster_label]
-    plt.scatter(cluster_data[selected_features[0]], cluster_data[selected_features[1]], c=color, label=f'Cluster {cluster_label} (K-Means)')
-
-    # Add a box with cluster counts slightly above the bottom-right corner
-    box_text = f'Cluster {cluster_label} (K-Means):\n{cluster_counts_kmeans[cluster_label]}'
-    plt.text(8, 0.5 + cluster_label * 0.5, box_text, fontsize=10, color=color, bbox=dict(facecolor='white', edgecolor='black', boxstyle='round'))
-
-plt.xlabel(f'{selected_features[0]} (Standardized)')
-plt.ylabel(f'{selected_features[1]} (Standardized)')
-plt.title(f'K-Means Clustering (k={num_clusters}) - SSE: {sse_kmeans:.2f}')
+    plt.scatter(cluster_data['SepalLengthCm'], cluster_data['SepalWidthCm'], c=color, label=f'Cluster {cluster_label} (K-Means)')
+plt.xlabel('SepalLengthCm')
+plt.ylabel('SepalWidthCm')
+plt.title(f'K-Means Clustering (k={num_clusters}) - SSE: {sse_kmeans:.2f}, Counts: {count_kmeans.values}')
 plt.legend()
-plt.show()
 
-print("SSE for K-Means:", sse_kmeans)
+plt.subplot(1, 3, 2)
+for cluster_label, color in zip(range(num_clusters), ['b', 'g', 'r']):
+    cluster_data = df[df['cluster_kmeans'] == cluster_label]
+    plt.scatter(cluster_data['SepalLengthCm'], cluster_data['PetalLengthCm'], c=color, label=f'Cluster {cluster_label} (K-Means)')
+plt.xlabel('SepalLengthCm')
+plt.ylabel('PetalLengthCm')
+plt.title(f'K-Means Clustering (k={num_clusters}) - SSE: {sse_kmeans:.2f}, Counts: {count_kmeans.values}')
+plt.legend()
+
+plt.subplot(1, 3, 3)
+for cluster_label, color in zip(range(num_clusters), ['b', 'g', 'r']):
+    cluster_data = df[df['cluster_kmeans'] == cluster_label]
+    plt.scatter(cluster_data['SepalLengthCm'], cluster_data['PetalWidthCm'], c=color, label=f'Cluster {cluster_label} (K-Means)')
+plt.xlabel('SepalLengthCm')
+plt.ylabel('PetalWidthCm')
+plt.title(f'K-Means Clustering (k={num_clusters}) - SSE: {sse_kmeans:.2f}, Counts: {count_kmeans.values}')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
